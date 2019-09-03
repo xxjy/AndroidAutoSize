@@ -19,6 +19,7 @@ import android.app.Activity;
 import android.app.Application;
 import android.app.Dialog;
 import android.content.Context;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.net.Uri;
 import android.util.DisplayMetrics;
@@ -163,6 +164,8 @@ public final class AutoSize {
         int targetDensityDpi = 0;
         float targetScaledDensity = 0;
         float targetXdpi = 0;
+        int targetScreenWidthDp;
+        int targetScreenHeightDp;
 
         if (displayMetricsInfo == null) {
             if (isBaseOnWidth) {
@@ -175,21 +178,26 @@ public final class AutoSize {
             targetScaledDensity = targetDensity * scale;
             targetDensityDpi = (int) (targetDensity * 160);
 
+            targetScreenWidthDp = (int) (AutoSizeConfig.getInstance().getScreenWidth() / targetDensity);
+            targetScreenHeightDp = (int) (AutoSizeConfig.getInstance().getScreenHeight() / targetDensity);
+
             if (isBaseOnWidth) {
                 targetXdpi = AutoSizeConfig.getInstance().getScreenWidth() * 1.0f / subunitsDesignSize;
             } else {
                 targetXdpi = AutoSizeConfig.getInstance().getScreenHeight() * 1.0f / subunitsDesignSize;
             }
 
-            mCache.put(key, new DisplayMetricsInfo(targetDensity, targetDensityDpi, targetScaledDensity, targetXdpi));
+            mCache.put(key, new DisplayMetricsInfo(targetDensity, targetDensityDpi, targetScaledDensity, targetXdpi, targetScreenWidthDp, targetScreenHeightDp));
         } else {
             targetDensity = displayMetricsInfo.getDensity();
             targetDensityDpi = displayMetricsInfo.getDensityDpi();
             targetScaledDensity = displayMetricsInfo.getScaledDensity();
             targetXdpi = displayMetricsInfo.getXdpi();
+            targetScreenWidthDp = displayMetricsInfo.getScreenWidthDp();
+            targetScreenHeightDp = displayMetricsInfo.getScreenHeightDp();
         }
 
-        setDensity(activity, targetDensity, targetDensityDpi, targetScaledDensity, targetXdpi);
+        setDensity(activity, targetDensity, targetDensityDpi, targetScaledDensity, targetXdpi, targetScreenWidthDp, targetScreenHeightDp);
 
         LogUtils.d(String.format(Locale.ENGLISH, "The %s has been adapted! \n%s Info: isBaseOnWidth = %s, %s = %f, %s = %f, targetDensity = %f, targetScaledDensity = %f, targetDensityDpi = %d, targetXdpi = %f"
                 , activity.getClass().getName(), activity.getClass().getSimpleName(), isBaseOnWidth, isBaseOnWidth ? "designWidthInDp"
@@ -216,7 +224,9 @@ public final class AutoSize {
         setDensity(activity, AutoSizeConfig.getInstance().getInitDensity()
                 , AutoSizeConfig.getInstance().getInitDensityDpi()
                 , AutoSizeConfig.getInstance().getInitScaledDensity()
-                , initXdpi);
+                , initXdpi
+                , AutoSizeConfig.getInstance().getInitScreenWidthDp()
+                , AutoSizeConfig.getInstance().getInitScreenHeightDp());
     }
 
     /**
@@ -232,13 +242,15 @@ public final class AutoSize {
     /**
      * 给几大 {@link DisplayMetrics} 赋值
      *
-     * @param activity      {@link Activity}
-     * @param density       {@link DisplayMetrics#density}
-     * @param densityDpi    {@link DisplayMetrics#densityDpi}
-     * @param scaledDensity {@link DisplayMetrics#scaledDensity}
-     * @param xdpi          {@link DisplayMetrics#xdpi}
+     * @param activity       {@link Activity}
+     * @param density        {@link DisplayMetrics#density}
+     * @param densityDpi     {@link DisplayMetrics#densityDpi}
+     * @param scaledDensity  {@link DisplayMetrics#scaledDensity}
+     * @param xdpi           {@link DisplayMetrics#xdpi}
+     * @param screenWidthDp  {@link Configuration#screenWidthDp}
+     * @param screenHeightDp {@link Configuration#screenHeightDp}
      */
-    private static void setDensity(Activity activity, float density, int densityDpi, float scaledDensity, float xdpi) {
+    private static void setDensity(Activity activity, float density, int densityDpi, float scaledDensity, float xdpi, int screenWidthDp, int screenHeightDp) {
         //兼容 MIUI
         DisplayMetrics activityDisplayMetricsOnMIUI = getMetricsOnMiui(activity.getResources());
         DisplayMetrics appDisplayMetricsOnMIUI = getMetricsOnMiui(AutoSizeConfig.getInstance().getApplication().getResources());
@@ -249,6 +261,8 @@ public final class AutoSize {
             DisplayMetrics activityDisplayMetrics = activity.getResources().getDisplayMetrics();
             setDensity(activityDisplayMetrics, density, densityDpi, scaledDensity, xdpi);
         }
+        Configuration activityConfiguration = activity.getResources().getConfiguration();
+        setScreenSizeDp(activityConfiguration, screenWidthDp, screenHeightDp);
 
         if (appDisplayMetricsOnMIUI != null) {
             setDensity(appDisplayMetricsOnMIUI, density, densityDpi, scaledDensity, xdpi);
@@ -256,6 +270,8 @@ public final class AutoSize {
             DisplayMetrics appDisplayMetrics = AutoSizeConfig.getInstance().getApplication().getResources().getDisplayMetrics();
             setDensity(appDisplayMetrics, density, densityDpi, scaledDensity, xdpi);
         }
+        Configuration appConfiguration = AutoSizeConfig.getInstance().getApplication().getResources().getConfiguration();
+        setScreenSizeDp(appConfiguration, screenWidthDp, screenHeightDp);
     }
 
     /**
@@ -288,6 +304,20 @@ public final class AutoSize {
                 displayMetrics.xdpi = xdpi * 25.4f;
                 break;
             default:
+        }
+    }
+
+    /**
+     * Configuration赋值
+     *
+     * @param configuration  {@link Configuration}
+     * @param screenWidthDp  {@link Configuration#screenWidthDp}
+     * @param screenHeightDp {@link Configuration#screenHeightDp}
+     */
+    private static void setScreenSizeDp(Configuration configuration, int screenWidthDp, int screenHeightDp) {
+        if (AutoSizeConfig.getInstance().getUnitsManager().isSupportDP()) {
+            configuration.screenWidthDp = screenWidthDp;
+            configuration.screenHeightDp = screenHeightDp;
         }
     }
 
